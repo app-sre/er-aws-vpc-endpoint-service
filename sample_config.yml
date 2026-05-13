@@ -1,0 +1,36 @@
+# Sample app-interface namespace configuration for a VPC Endpoint Service.
+#
+# Prerequisites:
+#   - An OpenShift Service of type LoadBalancer must exist in the same namespace,
+#     annotated with:
+#       service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+#       service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+#
+# The module discovers the NLB automatically via the kubernetes.io/service-name tag
+# set by the OpenShift cloud controller. No NLB ARN or ID is needed.
+#
+# Outputs are synced to a Kubernetes secret in the target namespace:
+#   endpoint_service_name  — the AWS service name (com.amazonaws.vpce.*)
+#   endpoint_service_id    — the VPC Endpoint Service ID
+#   nlb_arn                — the Network Load Balancer ARN
+#   nlb_dns_name           — the Network Load Balancer DNS name
+
+managedExternalResources: true
+externalResources:
+- provider: aws
+  provisioner:
+    $ref: /aws/my-aws-account/account.yml
+  resources:
+  - provider: vpc-endpoint-service
+    identifier: myservice-vpce-service
+    managed_by_erv2: true
+    openshift_service_name: myservice   # name of the OpenShift Service of type LoadBalancer
+
+    # Optional: clusters allowed to connect via PrivateLink.
+    # Each cluster's AWS account will be granted access via its IAM terraform user ARN.
+    # If omitted, the endpoint service is created with no allowed principals.
+    allowed_consumer_clusters:
+    - $ref: /openshift/consumer-cluster-1/cluster.yml
+    - $ref: /openshift/consumer-cluster-2/cluster.yml
+
+    output_resource_name: myservice-vpce-service   # name of the output Kubernetes secret
