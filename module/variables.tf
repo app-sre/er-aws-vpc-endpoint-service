@@ -22,3 +22,5 @@ variable "region" {
 variable "tags" {
   type = map(any)
 }
+
+variable "provision" {}
