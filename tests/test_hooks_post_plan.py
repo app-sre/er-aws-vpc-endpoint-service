@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,6 +10,9 @@ from external_resources_io.terraform import (
 
 from er_aws_vpc_endpoint_service.input import AppInterfaceInput
 from hooks.post_plan import VpcEndpointServicePlanValidator
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 @pytest.fixture
