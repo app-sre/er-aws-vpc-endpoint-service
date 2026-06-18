@@ -10,10 +10,14 @@
 # set by the OpenShift cloud controller. No NLB ARN or ID is needed.
 #
 # Outputs are synced to a Kubernetes secret in the target namespace:
-#   endpoint_service_name  — the AWS service name (com.amazonaws.vpce.*)
-#   endpoint_service_id    — the VPC Endpoint Service ID
-#   nlb_arn                — the Network Load Balancer ARN
-#   nlb_dns_name           — the Network Load Balancer DNS name
+#   endpoint_service_name                  — the AWS service name (com.amazonaws.vpce.*)
+#   endpoint_service_id                    — the VPC Endpoint Service ID
+#   nlb_arn                                — the Network Load Balancer ARN
+#   nlb_dns_name                           — the Network Load Balancer DNS name
+#   private_dns_verification_record_name   — TXT record name for domain ownership verification (null if private_dns_name is unset)
+#   private_dns_verification_record_type   — TXT record type for domain ownership verification
+#   private_dns_verification_record_value  — TXT record value for domain ownership verification
+#   private_dns_verification_state         — pendingVerification, verified, or failed
 
 managedExternalResources: true
 externalResources:
@@ -32,5 +36,10 @@ externalResources:
     allowed_consumer_clusters:
     - $ref: /openshift/consumer-cluster-1/cluster.yml
     - $ref: /openshift/consumer-cluster-2/cluster.yml
+
+    # Optional: the original service hostname to enable AWS PrivateLink Private DNS.
+    # Requires domain ownership verification via a TXT record (see the module README).
+    # If omitted, consumers connect using the raw VPC Endpoint DNS name.
+    private_dns_name: myservice.example.com
 
     output_resource_name: myservice-vpce-service   # name of the output Kubernetes secret

@@ -17,3 +17,23 @@ output "nlb_dns_name" {
   description = "The DNS name of the Network Load Balancer"
   value       = data.aws_lb.openshift.dns_name
 }
+
+output "private_dns_verification_record_name" {
+  description = "The DNS record name for domain ownership verification"
+  value       = try(aws_vpc_endpoint_service.this.private_dns_name_configuration[0].name, null)
+}
+
+output "private_dns_verification_record_type" {
+  description = "The DNS record type for domain ownership verification"
+  value       = try(aws_vpc_endpoint_service.this.private_dns_name_configuration[0].type, null)
+}
+
+output "private_dns_verification_record_value" {
+  description = "The DNS record value for domain ownership verification"
+  value       = try(aws_vpc_endpoint_service.this.private_dns_name_configuration[0].value, null)
+}
+
+output "private_dns_verification_state" {
+  description = "The verification state of the private DNS name (pendingVerification, verified, failed)"
+  value       = try(aws_vpc_endpoint_service.this.private_dns_name_configuration[0].state, null)
+}
