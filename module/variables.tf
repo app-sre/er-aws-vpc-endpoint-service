@@ -15,6 +15,11 @@ variable "output_resource_name" {
   default = null
 }
 
+variable "private_dns_name" {
+  type    = string
+  default = null
+}
+
 variable "region" {
   type = string
 }

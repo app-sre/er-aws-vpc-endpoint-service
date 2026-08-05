@@ -13,6 +13,7 @@ class VpcEndpointServiceData(BaseModel):
     identifier: str
     openshift_service_name: str
     allowed_principal_arns: list[str] = Field(default_factory=list)
+    private_dns_name: str | None = None
     tags: dict[str, Any] = Field(default_factory=dict)
     output_resource_name: str | None = None
 
@@ -48,6 +49,11 @@ class TerraformModuleData(BaseModel):
     def allowed_principal_arns(self) -> list[str]:
         """Allowed principal ARNs"""
         return self.ai_input.data.allowed_principal_arns
+
+    @computed_field
+    def private_dns_name(self) -> str | None:
+        """Private DNS name"""
+        return self.ai_input.data.private_dns_name
 
     @computed_field
     def tags(self) -> dict[str, Any]:

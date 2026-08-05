@@ -17,5 +17,6 @@ resource "aws_vpc_endpoint_service" "this" {
   network_load_balancer_arns = [data.aws_lb.openshift.arn]
   allowed_principals         = var.allowed_principal_arns
   supported_ip_address_types = ["ipv4"]
+  private_dns_name           = var.private_dns_name
   tags                       = local.tags
 }

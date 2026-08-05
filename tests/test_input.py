@@ -41,6 +41,17 @@ def test_data_fields(base_input: dict) -> None:
     assert ai_input.data.tags == base_input["data"]["tags"]
 
 
+def test_private_dns_name_default(base_input: dict) -> None:
+    ai_input = AppInterfaceInput.model_validate(base_input)
+    assert ai_input.data.private_dns_name is None
+
+
+def test_private_dns_name_set(base_input: dict) -> None:
+    base_input["data"]["private_dns_name"] = "vault.devshift.net"
+    ai_input = AppInterfaceInput.model_validate(base_input)
+    assert ai_input.data.private_dns_name == "vault.devshift.net"
+
+
 def test_missing_required_field(base_input: dict) -> None:
     del base_input["data"]["openshift_service_name"]
     with pytest.raises(ValidationError):

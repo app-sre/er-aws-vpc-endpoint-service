@@ -20,6 +20,7 @@ Wraps an existing Network Load Balancer (NLB) provisioned by an OpenShift Servic
 - **`acceptance_required` is hardcoded to `false`** — connections from allowed principals are accepted automatically.
 - **Allowed principals are IAM root ARNs** — derived from the AWS account UID of each consumer cluster. Grants access to all IAM identities in that account.
 - **IPv4 only** — `supported_ip_address_types` is hardcoded to `["ipv4"]`.
+- **Private DNS is opt-in** — setting `private_dns_name` requires proving domain ownership via a TXT record. The module outputs the verification record details (`private_dns_verification_record_*`); the record must be created manually in the domain's public DNS zone. Consumers can then set `private_dns_enabled` on [`er-aws-vpc-endpoint`](https://github.com/app-sre/er-aws-vpc-endpoint) once AWS reports the name as verified.
 
 ## Tech stack
 
