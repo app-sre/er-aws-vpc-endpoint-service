@@ -1,13 +1,11 @@
 import json
-import subprocess  # ruff: ignore[suspicious-subprocess-import] - Terraform is invoked without a shell
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 from external_resources_io.config import Config
 
 from er_aws_vpc_endpoint_service.input import AppInterfaceInput
-from hooks.post_output import VERIFICATION_OUTPUTS, sync_private_dns_outputs
+from hooks.post_output import VERIFICATION_OUTPUTS, validate_private_dns_outputs
 
 
 @pytest.fixture
@@ -20,8 +18,6 @@ def config(tmp_path: Path) -> Config:
         DRY_RUN=False,
         ACTION="Apply",
         OUTPUTS_FILE=str(output_path),
-        TERRAFORM_CMD="terraform -chdir=/work/module",
-        TF_VARS_FILE="/work/module/terraform.tfvars.json",
     )
 
 
@@ -43,7 +39,7 @@ def outputs() -> dict:
 
 
 @pytest.mark.parametrize("skip", ["dry_run", "destroy", "no_dns", "complete"])
-def test_skip_refresh(
+def test_skip_validation(
     config: Config, dns_input: AppInterfaceInput, outputs: dict, skip: str
 ) -> None:
     if skip == "dry_run":
@@ -54,13 +50,13 @@ def test_skip_refresh(
         dns_input.data.private_dns_name = None
     else:
         Path(config.outputs_file).write_text(json.dumps(outputs), encoding="utf-8")
-    with patch("hooks.post_output.subprocess.run") as run:
-        sync_private_dns_outputs(config, dns_input)
-    run.assert_not_called()
+    original = Path(config.outputs_file).read_text(encoding="utf-8")
+    validate_private_dns_outputs(config, dns_input)
+    assert Path(config.outputs_file).read_text(encoding="utf-8") == original
 
 
 @pytest.mark.parametrize("missing", [None, *VERIFICATION_OUTPUTS])
-def test_refresh_recovers_missing_output(
+def test_missing_output_requests_another_run(
     config: Config, dns_input: AppInterfaceInput, outputs: dict, missing: str | None
 ) -> None:
     Path(config.outputs_file).write_text(
@@ -71,56 +67,24 @@ def test_refresh_recovers_missing_output(
         }),
         encoding="utf-8",
     )
-    with patch("hooks.post_output.subprocess.run") as run:
-        run.return_value = MagicMock(stdout=json.dumps(outputs))
-        sync_private_dns_outputs(config, dns_input)
-    assert run.call_args_list[0].args[0] == [
-        "terraform",
-        "-chdir=/work/module",
-        "apply",
-        "-refresh-only",
-        "-auto-approve",
-        "-input=false",
-        "-lock=true",
-        "-var-file=/work/module/terraform.tfvars.json",
-    ]
-    assert run.call_args_list[1].args[0] == [
-        "terraform",
-        "-chdir=/work/module",
-        "output",
-        "-json",
-    ]
-    assert json.loads(Path(config.outputs_file).read_text(encoding="utf-8")) == outputs
-
-
-def test_refresh_failure_stops_export(
-    config: Config, dns_input: AppInterfaceInput
-) -> None:
     original = Path(config.outputs_file).read_text(encoding="utf-8")
-    with (
-        patch(
-            "hooks.post_output.subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "terraform"),
-        ) as run,
-        pytest.raises(subprocess.CalledProcessError),
-    ):
-        sync_private_dns_outputs(config, dns_input)
-    assert run.call_count == 1
+    with pytest.raises(SystemExit) as exc:
+        validate_private_dns_outputs(config, dns_input)
+    assert exc.value.code == 1
     assert Path(config.outputs_file).read_text(encoding="utf-8") == original
 
 
+@pytest.mark.parametrize("key", VERIFICATION_OUTPUTS)
 @pytest.mark.parametrize("value", [None, ""])
-def test_missing_after_refresh_fails(
-    config: Config, dns_input: AppInterfaceInput, outputs: dict, value: str | None
+def test_empty_output_requests_another_run(
+    config: Config,
+    dns_input: AppInterfaceInput,
+    outputs: dict,
+    key: str,
+    value: str | None,
 ) -> None:
-    original = Path(config.outputs_file).read_text(encoding="utf-8")
-    outputs["private_dns_verification_record_value"]["value"] = value
-    with (
-        patch(
-            "hooks.post_output.subprocess.run",
-            return_value=MagicMock(stdout=json.dumps(outputs)),
-        ),
-        pytest.raises(RuntimeError, match="private_dns_verification_record_value"),
-    ):
-        sync_private_dns_outputs(config, dns_input)
-    assert Path(config.outputs_file).read_text(encoding="utf-8") == original
+    outputs[key]["value"] = value
+    Path(config.outputs_file).write_text(json.dumps(outputs), encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        validate_private_dns_outputs(config, dns_input)
+    assert exc.value.code == 1

@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-import shlex
-import subprocess  # ruff: ignore[suspicious-subprocess-import] - Terraform is invoked without a shell
+import sys
 from pathlib import Path
 
 from external_resources_io.config import Action, Config
@@ -23,8 +22,8 @@ VERIFICATION_OUTPUTS = (
 )
 
 
-def sync_private_dns_outputs(config: Config, ai_input: AppInterfaceInput) -> None:
-    """Recover verification outputs omitted when enabling Private DNS."""
+def validate_private_dns_outputs(config: Config, ai_input: AppInterfaceInput) -> None:
+    """Require verification outputs before allowing secret synchronization."""
     if (
         config.dry_run
         or config.action != Action.APPLY
@@ -34,44 +33,20 @@ def sync_private_dns_outputs(config: Config, ai_input: AppInterfaceInput) -> Non
 
     output_path = Path(config.outputs_file)
     outputs = json.loads(output_path.read_text(encoding="utf-8"))
-    if all(outputs.get(key, {}).get("value") for key in VERIFICATION_OUTPUTS):
-        return
-
-    logger.info(
-        "Refreshing Terraform state to recover Private DNS verification outputs"
-    )
-    command = shlex.split(config.terraform_cmd)
-    subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - command comes from the Terraform runner, not resource input
-        [
-            *command,
-            "apply",
-            "-refresh-only",
-            "-auto-approve",
-            "-input=false",
-            "-lock=true",
-            f"-var-file={config.tf_vars_file}",
-        ],
-        check=True,
-    )
-    result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true] - command comes from the Terraform runner
-        [*command, "output", "-json"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    outputs = json.loads(result.stdout)
     missing = [
         key for key in VERIFICATION_OUTPUTS if not outputs.get(key, {}).get("value")
     ]
     if missing:
-        raise RuntimeError(
-            f"Private DNS verification outputs missing after refresh: {missing}"
+        logger.error(
+            "Private DNS verification outputs missing: %s. "
+            "Failing the job so external-resources schedules another apply.",
+            ", ".join(missing),
         )
-    output_path.write_text(result.stdout, encoding="utf-8")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     setup_logging()
-    sync_private_dns_outputs(
+    validate_private_dns_outputs(
         Config(), parse_model(AppInterfaceInput, read_input_from_file())
     )
