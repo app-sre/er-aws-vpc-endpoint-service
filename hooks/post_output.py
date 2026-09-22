@@ -5,12 +5,16 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from external_resources_io.config import Action, Config
+from external_resources_io.config import Config
 from external_resources_io.input import parse_model, read_input_from_file
 from external_resources_io.log import setup_logging
 
 from er_aws_vpc_endpoint_service.input import AppInterfaceInput
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -22,31 +26,25 @@ VERIFICATION_OUTPUTS = (
 )
 
 
-def validate_private_dns_outputs(config: Config, ai_input: AppInterfaceInput) -> None:
-    """Require verification outputs before allowing secret synchronization."""
-    if (
-        config.dry_run
-        or config.action != Action.APPLY
-        or not ai_input.data.private_dns_name
-    ):
-        return
+def check(outputs: Mapping) -> bool:
+    """Check that Private DNS verification outputs are populated."""
+    for key in VERIFICATION_OUTPUTS:
+        if not outputs.get(key, {}).get("value"):
+            logger.error("%s output not found.", key)
+            return False
+    return True
 
-    output_path = Path(config.outputs_file)
-    outputs = json.loads(output_path.read_text(encoding="utf-8"))
-    missing = [
-        key for key in VERIFICATION_OUTPUTS if not outputs.get(key, {}).get("value")
-    ]
-    if missing:
-        logger.error(
-            "Private DNS verification outputs missing: %s. "
-            "Failing the job so external-resources schedules another apply.",
-            ", ".join(missing),
-        )
+
+def main() -> None:
+    """Check outputs when Private DNS is configured."""
+    ai_input = parse_model(AppInterfaceInput, read_input_from_file())
+    if not ai_input.data.private_dns_name:
+        return
+    output_json = Path(Config().outputs_file)
+    if not check(json.loads(output_json.read_text(encoding="utf-8"))):
         sys.exit(1)
 
 
 if __name__ == "__main__":
     setup_logging()
-    validate_private_dns_outputs(
-        Config(), parse_model(AppInterfaceInput, read_input_from_file())
-    )
+    main()
