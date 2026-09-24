@@ -44,20 +44,33 @@ class VpcEndpointServicePostApply:
         configurations = response.get("ServiceConfigurations", [])
         if not configurations:
             raise RuntimeError(f"VPC Endpoint Service {service_id} was not found")
-        if not configurations[0].get("PrivateDnsName"):
+        private_dns_name = configurations[0].get("PrivateDnsName")
+        if not private_dns_name:
+            return
+
+        if self.config.dry_run:
+            logger.info(
+                "Would remove private DNS name %s from VPC Endpoint Service %s",
+                private_dns_name,
+                service_id,
+            )
             return
 
         ec2.modify_vpc_endpoint_service_configuration(
             ServiceId=service_id, RemovePrivateDnsName=True
         )
-        logger.info("Removed private DNS name from VPC Endpoint Service %s", service_id)
+        logger.info(
+            "Removed private DNS name %s from VPC Endpoint Service %s",
+            private_dns_name,
+            service_id,
+        )
         sys.exit(1)
 
 
 def main() -> None:
-    """Run post-apply actions for a real apply."""
+    """Run post-apply actions for an apply."""
     config = Config()
-    if config.dry_run or config.action != Action.APPLY:
+    if config.action != Action.APPLY:
         return
 
     ai_input = parse_model(AppInterfaceInput, read_input_from_file())
