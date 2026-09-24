@@ -25,7 +25,7 @@ def post_apply(
 
 @pytest.mark.parametrize(
     ("dry_run", "action"),
-    [(True, Action.APPLY), (False, Action.DESTROY)],
+    [(True, Action.DESTROY), (False, Action.DESTROY)],
 )
 def test_main_skips_non_apply(*, dry_run: bool, action: Action) -> None:
     with (
@@ -41,7 +41,7 @@ def test_main_skips_non_apply(*, dry_run: bool, action: Action) -> None:
 
 def test_main_calls_removal(base_input: dict) -> None:
     with (
-        patch("hooks.post_apply.Config", return_value=Config(DRY_RUN=False)),
+        patch("hooks.post_apply.Config", return_value=Config(DRY_RUN=True)),
         patch("hooks.post_apply.read_input_from_file", return_value=base_input),
         patch("hooks.post_apply.VpcEndpointServicePostApply") as handler,
     ):

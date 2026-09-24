@@ -47,6 +47,12 @@ class VpcEndpointServicePostApply:
         if not configurations[0].get("PrivateDnsName"):
             return
 
+        if self.config.dry_run:
+            logger.info(
+                "Would remove private DNS name from VPC Endpoint Service %s", service_id
+            )
+            return
+
         ec2.modify_vpc_endpoint_service_configuration(
             ServiceId=service_id, RemovePrivateDnsName=True
         )
@@ -55,9 +61,9 @@ class VpcEndpointServicePostApply:
 
 
 def main() -> None:
-    """Run post-apply actions for a real apply."""
+    """Run post-apply actions for an apply."""
     config = Config()
-    if config.dry_run or config.action != Action.APPLY:
+    if config.action != Action.APPLY:
         return
 
     ai_input = parse_model(AppInterfaceInput, read_input_from_file())
