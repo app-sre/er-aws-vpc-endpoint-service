@@ -87,4 +87,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     setup_logging()
+    logging.getLogger("botocore.credentials").setLevel(logging.WARNING)
     main()
