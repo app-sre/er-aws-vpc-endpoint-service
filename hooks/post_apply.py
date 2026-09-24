@@ -9,6 +9,7 @@ from pathlib import Path
 from external_resources_io.config import Action, Config
 from external_resources_io.input import parse_model, read_input_from_file
 from external_resources_io.log import setup_logging
+from external_resources_io.terraform import TerraformJsonPlanParser
 
 from er_aws_vpc_endpoint_service.input import AppInterfaceInput
 from hooks_lib.aws_api import AWSApi
@@ -32,7 +33,13 @@ class VpcEndpointServicePostApply:
         if self.input.data.private_dns_name:
             return
 
-        outputs = json.loads(Path(self.config.outputs_file).read_text(encoding="utf-8"))
+        if self.config.dry_run:
+            plan = TerraformJsonPlanParser(plan_path=self.config.plan_file_json).plan
+            outputs = (plan.planned_values or {}).get("outputs") or {}
+        else:
+            outputs = json.loads(
+                Path(self.config.outputs_file).read_text(encoding="utf-8")
+            )
         service_id = outputs.get("endpoint_service_id", {}).get("value")
         if not service_id:
             return
