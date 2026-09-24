@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from unittest.mock import patch
 
@@ -99,3 +100,42 @@ def test_private_dns_is_removed(post_apply: VpcEndpointServicePostApply) -> None
     ec2.modify_vpc_endpoint_service_configuration.assert_called_once_with(
         ServiceId="vpce-svc-123", RemovePrivateDnsName=True
     )
+
+
+def test_dry_run_reports_removal_without_outputs(
+    ai_input: AppInterfaceInput, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    plan_file = tmp_path / "plan.json"
+    plan_file.write_text(
+        json.dumps({
+            "format_version": "1.0",
+            "planned_values": {
+                "outputs": {"endpoint_service_id": {"value": "vpce-svc-123"}}
+            },
+        }),
+        encoding="utf-8",
+    )
+    post_apply = VpcEndpointServicePostApply(
+        Config(
+            DRY_RUN=True,
+            PLAN_FILE_JSON=str(plan_file),
+            OUTPUTS_FILE=str(tmp_path / "missing-output.json"),
+        ),
+        ai_input,
+    )
+    with patch("hooks.post_apply.AWSApi") as aws_api:
+        ec2 = aws_api.return_value.ec2_client
+        ec2.describe_vpc_endpoint_service_configurations.return_value = {
+            "ServiceConfigurations": [{"PrivateDnsName": "test.devshift.net"}]
+        }
+        post_apply.remove_private_dns_name()
+
+    ec2.describe_vpc_endpoint_service_configurations.assert_called_once_with(
+        ServiceIds=["vpce-svc-123"]
+    )
+    ec2.modify_vpc_endpoint_service_configuration.assert_not_called()
+    assert (
+        "Would remove private DNS name test.devshift.net "
+        "from VPC Endpoint Service vpce-svc-123"
+    ) in caplog.text
