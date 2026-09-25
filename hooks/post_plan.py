@@ -62,7 +62,6 @@ class VpcEndpointServicePlanValidator:
 
 if __name__ == "__main__":
     setup_logging()
-    logging.getLogger("botocore.credentials").setLevel(logging.WARNING)
     app_interface_input = parse_model(AppInterfaceInput, read_input_from_file())
     plan = TerraformJsonPlanParser(plan_path=Config().plan_file_json)
     validator = VpcEndpointServicePlanValidator(plan, app_interface_input)
